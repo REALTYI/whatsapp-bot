@@ -9,6 +9,20 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+@app.route("/", methods=["GET", "POST"])
+def root():
+    logger.info("Received request at root URL")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    logger.info(f"Request values: {dict(request.values)}")
+    
+    # Handle POST requests (from Twilio)
+    if request.method == "POST":
+        return whatsapp()
+    
+    # Handle GET requests
+    return "WhatsApp Bot is running!"
+
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp():
     # Log all request data
