@@ -8,6 +8,10 @@ import os
 import logging
 import pickle
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(
@@ -21,6 +25,10 @@ app = Flask(__name__)
 # Google Calendar API setup
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
+
+# Check for required environment variables
+if not CALENDAR_ID:
+    logger.warning("GOOGLE_CALENDAR_ID not set. Calendar functionality will be disabled.")
 
 # User session management
 user_sessions = {}
@@ -41,26 +49,38 @@ def get_user_session(phone_number):
 
 def get_google_calendar_service():
     """Get or create Google Calendar service"""
-    creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-    
-    return build('calendar', 'v3', credentials=creds)
+    try:
+        creds = None
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+        
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                if not os.path.exists('credentials.json'):
+                    logger.error("credentials.json not found. Calendar functionality will be disabled.")
+                    return None
+                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                creds = flow.run_local_server(port=0)
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
+        
+        return build('calendar', 'v3', credentials=creds)
+    except Exception as e:
+        logger.error(f"Error initializing Google Calendar service: {str(e)}")
+        return None
 
 def schedule_visit(property_name, visitor_name, phone_number, preferred_date, preferred_time):
     """Schedule a property visit in Google Calendar"""
+    if not CALENDAR_ID:
+        return False, "Calendar functionality is not configured"
+    
     try:
         service = get_google_calendar_service()
+        if not service:
+            return False, "Calendar service is not available"
         
         visit_datetime = datetime.strptime(f"{preferred_date} {preferred_time}", "%Y-%m-%d %H:%M")
         
@@ -240,6 +260,13 @@ def handle_property_details(property):
     response += "4. Back to search 🔍"
     
     return response
+
+@app.route("/", methods=["GET", "POST"])
+def root():
+    """Root endpoint for health checks"""
+    if request.method == "POST":
+        return whatsapp()
+    return "WhatsApp Bot is running!"
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp():
