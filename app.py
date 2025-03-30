@@ -103,6 +103,16 @@ def schedule_visit(property_name, visitor_name, phone_number, preferred_date, pr
         logger.error(f"Error scheduling visit: {str(e)}")
         return False, str(e)
 
+def send_property_images(response, property_images):
+    """Send property images using Twilio's Media Message API"""
+    try:
+        for image_url in property_images[:10]:  # Twilio limits to 10 media items per message
+            response.message().media(image_url)
+        return True
+    except Exception as e:
+        logger.error(f"Error sending property images: {str(e)}")
+        return False
+
 # Sample property data with image URLs and virtual tours
 PROPERTIES = {
     "mumbai": {
@@ -113,8 +123,9 @@ PROPERTIES = {
                 "location": "Bandra",
                 "features": "3BHK, Sea View, Gym",
                 "images": [
-                    "https://example.com/properties/mumbai/bandra-sea-view-1.jpg",
-                    "https://example.com/properties/mumbai/bandra-sea-view-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ],
                 "virtual_tour": "https://example.com/virtual-tours/bandra-sea-view",
                 "description": "Stunning 3BHK apartment with panoramic sea views, modern amenities, and 24/7 security."
@@ -200,16 +211,6 @@ PROPERTIES = {
         ]
     }
 }
-
-def send_property_images(response, property_images):
-    """Send property images using Twilio's Media Message API"""
-    try:
-        for image_url in property_images[:10]:
-            response.message().media(image_url)
-        return True
-    except Exception as e:
-        logger.error(f"Error sending property images: {str(e)}")
-        return False
 
 def handle_property_search(location, property_type, budget=None):
     """Handle property search and return formatted response"""
