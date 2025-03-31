@@ -127,7 +127,7 @@ PROPERTIES = {
                     "https://imgur.com/ihW0dlY",
                     "https://imgur.com/YGxOIlh"
                 ],
-                "virtual_tour": "https://example.com/virtual-tours/bandra-sea-view",
+                "virtual_tour": "https://imgur.com/vFCCHtC",
                 "description": "Stunning 3BHK apartment with panoramic sea views, modern amenities, and 24/7 security."
             },
             {
@@ -136,8 +136,9 @@ PROPERTIES = {
                 "location": "Andheri",
                 "features": "1BHK, Smart Home",
                 "images": [
-                    "https://example.com/properties/mumbai/andheri-studio-1.jpg",
-                    "https://example.com/properties/mumbai/andheri-studio-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
         ],
@@ -148,8 +149,9 @@ PROPERTIES = {
                 "location": "Juhu",
                 "features": "4BHK, Garden, Pool",
                 "images": [
-                    "https://example.com/properties/mumbai/juhu-bungalow-1.jpg",
-                    "https://example.com/properties/mumbai/juhu-bungalow-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
             {
@@ -158,8 +160,9 @@ PROPERTIES = {
                 "location": "Powai",
                 "features": "3BHK, Terrace, Parking",
                 "images": [
-                    "https://example.com/properties/mumbai/powai-villa-1.jpg",
-                    "https://example.com/properties/mumbai/powai-villa-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
         ]
@@ -172,8 +175,9 @@ PROPERTIES = {
                 "location": "South Delhi",
                 "features": "4BHK, Terrace, Security",
                 "images": [
-                    "https://example.com/properties/delhi/south-delhi-penthouse-1.jpg",
-                    "https://example.com/properties/delhi/south-delhi-penthouse-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
             {
@@ -182,8 +186,9 @@ PROPERTIES = {
                 "location": "Noida",
                 "features": "2BHK, Smart Home",
                 "images": [
-                    "https://example.com/properties/delhi/noida-smart-1.jpg",
-                    "https://example.com/properties/delhi/noida-smart-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
         ],
@@ -194,8 +199,9 @@ PROPERTIES = {
                 "location": "Lutyens Delhi",
                 "features": "5BHK, Garden, Servant Room",
                 "images": [
-                    "https://example.com/properties/delhi/lutyens-colonial-1.jpg",
-                    "https://example.com/properties/delhi/lutyens-colonial-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
             {
@@ -204,8 +210,9 @@ PROPERTIES = {
                 "location": "Gurgaon",
                 "features": "3BHK, Pool, Club House",
                 "images": [
-                    "https://example.com/properties/delhi/gurgaon-villa-1.jpg",
-                    "https://example.com/properties/delhi/gurgaon-villa-2.jpg"
+                    "https://imgur.com/vFCCHtC",
+                    "https://imgur.com/ihW0dlY",
+                    "https://imgur.com/YGxOIlh"
                 ]
             },
         ]
