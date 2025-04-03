@@ -57,6 +57,36 @@ except Exception as e:
 # Session data
 sessions = {}
 
+def parse_indian_currency(amount_str: str) -> int:
+    """Parse Indian currency format (e.g., '1cr', '50lakhs', '1.5cr') to rupees"""
+    try:
+        # Remove spaces and convert to lowercase
+        amount_str = amount_str.lower().strip()
+        
+        # Remove '₹' symbol if present
+        amount_str = amount_str.replace('₹', '').strip()
+        
+        # Handle crore format
+        if 'cr' in amount_str:
+            # Extract the number before 'cr'
+            number = float(amount_str.replace('cr', '').strip())
+            return int(number * 10000000)  # 1 crore = 10 million rupees
+            
+        # Handle lakhs format
+        elif 'lakh' in amount_str or 'lac' in amount_str:
+            # Extract the number before 'lakh' or 'lac'
+            number = float(amount_str.replace('lakh', '').replace('lac', '').strip())
+            return int(number * 100000)  # 1 lakh = 100,000 rupees
+            
+        # Handle direct number format
+        else:
+            # Remove commas and convert to integer
+            return int(float(amount_str.replace(',', '')))
+            
+    except (ValueError, AttributeError) as e:
+        logger.error(f"Error parsing amount: {str(e)}")
+        return 0
+
 def send_property_images(response, images):
     """Send property images using Twilio's Media Message API"""
     try:
@@ -90,7 +120,7 @@ def whatsapp_bot():
     if current_step == 'collecting_info':
         if 'bhk' in incoming_msg:
             sessions[from_number]['bhk'] = incoming_msg
-            response.message("Great choice! What's your budget range?")
+            response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')")
             sessions[from_number]['step'] = 'collecting_budget'
             return str(response)
         response.message("Could you specify the property type? (e.g., '3BHK apartment')")
@@ -98,15 +128,14 @@ def whatsapp_bot():
 
     # Collecting budget
     if current_step == 'collecting_budget':
-        try:
-            budget = int(incoming_msg.replace("₹", "").replace(" ", ""))
+        budget = parse_indian_currency(incoming_msg)
+        if budget > 0:
             sessions[from_number]['budget'] = budget
             response.message("Got it! Any preferred location?")
             sessions[from_number]['step'] = 'collecting_location'
             return str(response)
-        except ValueError:
-            response.message("Please enter a valid budget amount.")
-            return str(response)
+        response.message("Please enter a valid budget amount (e.g., '1cr', '50lakhs', '1.5cr')")
+        return str(response)
 
     # Collecting location
     if current_step == 'collecting_location':
