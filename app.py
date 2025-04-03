@@ -110,9 +110,25 @@ def whatsapp_bot():
     current_step = sessions[from_number]['step']
     logger.info(f"Incoming message from {from_number}: {incoming_msg} | Current step: {current_step}")
 
+    # Handle back and start commands
+    if incoming_msg in ['back', 'start']:
+        if incoming_msg == 'start':
+            sessions[from_number] = {'step': 'start'}
+        elif current_step == 'collecting_budget':
+            sessions[from_number]['step'] = 'collecting_info'
+        elif current_step == 'collecting_location':
+            sessions[from_number]['step'] = 'collecting_budget'
+        elif current_step == 'details':
+            sessions[from_number]['step'] = 'collecting_location'
+        elif current_step == 'visit':
+            sessions[from_number]['step'] = 'details'
+        
+        # Return to the appropriate step
+        return whatsapp_bot()
+
     # Greeting
     if current_step == 'start':
-        response.message("Hi there! 👋 Welcome to Real Estate Bot. How can I help you today? (e.g., 'Looking for a 3BHK')")
+        response.message("Hi there! 👋 Welcome to Real Estate Bot. How can I help you today? (e.g., 'Looking for a 3BHK')\n\nType 'start' anytime to begin again.")
         sessions[from_number]['step'] = 'collecting_info'
         return str(response)
 
@@ -120,10 +136,10 @@ def whatsapp_bot():
     if current_step == 'collecting_info':
         if 'bhk' in incoming_msg:
             sessions[from_number]['bhk'] = incoming_msg
-            response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')")
+            response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
             sessions[from_number]['step'] = 'collecting_budget'
             return str(response)
-        response.message("Could you specify the property type? (e.g., '3BHK apartment')")
+        response.message("Could you specify the property type? (e.g., '3BHK apartment')\n\nType 'start' to begin again")
         return str(response)
 
     # Collecting budget
@@ -131,10 +147,10 @@ def whatsapp_bot():
         budget = parse_indian_currency(incoming_msg)
         if budget > 0:
             sessions[from_number]['budget'] = budget
-            response.message("Got it! Any preferred location?")
+            response.message("Got it! Any preferred location?\n\nType 'back' to change budget\nType 'start' to begin again")
             sessions[from_number]['step'] = 'collecting_location'
             return str(response)
-        response.message("Please enter a valid budget amount (e.g., '1cr', '50lakhs', '1.5cr')")
+        response.message("Please enter a valid budget amount (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
         return str(response)
 
     # Collecting location
@@ -144,7 +160,7 @@ def whatsapp_bot():
         # Listing matching properties
         for prop_id, details in PROPERTIES.items():
             response.message(f"🏡 {details['name']}: ₹{details['price']} at {details['location']} ({details['bhk']} BHK)")
-        response.message("Reply with the property name for more details.")
+        response.message("Reply with the property name for more details.\n\nType 'back' to change location\nType 'start' to begin again")
         sessions[from_number]['step'] = 'details'
         return str(response)
 
@@ -153,11 +169,11 @@ def whatsapp_bot():
         if incoming_msg == details['name'].lower() and current_step == 'details':
             response.message(f"Property: {details['name']}\nPrice: ₹{details['price']}\nLocation: {details['location']}\nDescription: {details['description']}")
             send_property_images(response, details.get('images', []))
-            response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')")
+            response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')\n\nType 'back' to see other properties\nType 'start' to begin again")
             sessions[from_number]['step'] = 'visit'
             return str(response)
 
-    response.message("Sorry, I didn't get that. Please try again.")
+    response.message("Sorry, I didn't get that. Please try again.\n\nType 'back' to go back\nType 'start' to begin again")
     return str(response)
 
 @app.route('/', methods=['GET'])
