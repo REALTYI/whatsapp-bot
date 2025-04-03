@@ -3,6 +3,11 @@ import logging
 from datetime import datetime
 from flask import Flask, request, jsonify
 from twilio.twiml.messaging_response import MessagingResponse
+from sheets import get_property_data, format_property_data
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -10,21 +15,44 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Property database
-PROPERTIES = {
-    'property1': {
-        'name': 'Ocean View Apartment',
-        'price': 12000000,
-        'location': 'Bandra, Mumbai',
-        'bhk': 3,
-        'description': 'Luxurious sea-facing apartment',
-        'images': [
-            'https://imgur.com/vFCCHtC',
-            'https://imgur.com/ihW0dlY',
-            'https://imgur.com/YGxOIlh'
-        ]
+# Initialize property data from Google Sheets
+try:
+    records = get_property_data()
+    if records:
+        PROPERTIES = format_property_data(records)
+        logger.info(f"Successfully loaded {len(PROPERTIES)} properties from Google Sheets")
+    else:
+        logger.warning("No records found in Google Sheets, using default data")
+        PROPERTIES = {
+            'property1': {
+                'name': 'Ocean View Apartment',
+                'price': 12000000,
+                'location': 'Bandra, Mumbai',
+                'bhk': 3,
+                'description': 'Luxurious sea-facing apartment',
+                'images': [
+                    'https://imgur.com/vFCCHtC',
+                    'https://imgur.com/ihW0dlY',
+                    'https://imgur.com/YGxOIlh'
+                ]
+            }
+        }
+except Exception as e:
+    logger.error(f"Error loading properties from Google Sheets: {str(e)}")
+    PROPERTIES = {
+        'property1': {
+            'name': 'Ocean View Apartment',
+            'price': 12000000,
+            'location': 'Bandra, Mumbai',
+            'bhk': 3,
+            'description': 'Luxurious sea-facing apartment',
+            'images': [
+                'https://imgur.com/vFCCHtC',
+                'https://imgur.com/ihW0dlY',
+                'https://imgur.com/YGxOIlh'
+            ]
+        }
     }
-}
 
 # Session data
 sessions = {}
