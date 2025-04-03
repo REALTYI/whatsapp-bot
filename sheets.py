@@ -114,10 +114,19 @@ def format_property_data(records: List[Dict[str, Any]]) -> Dict[str, Dict[str, A
                 logger.info(f"Processing record {idx}: {record.get('name', 'Unnamed')}")
                 
                 # Convert price to integer, handling different formats
+                price_str = str(record.get('price', '0'))
                 try:
-                    price = int(float(str(record.get('price', '0')).replace(',', '')))
+                    # Handle 'Cr' format
+                    if 'cr' in price_str.lower():
+                        price = float(price_str.lower().replace('cr', '').strip()) * 10000000
+                    # Handle 'L' format
+                    elif 'l' in price_str.lower():
+                        price = float(price_str.lower().replace('l', '').strip()) * 100000
+                    else:
+                        price = float(price_str.replace(',', ''))
+                    price = int(price)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid price format in record {idx}: {record.get('price')}")
+                    logger.warning(f"Invalid price format in record {idx}: {price_str}")
                     price = 0
 
                 # Convert BHK to integer
@@ -138,7 +147,7 @@ def format_property_data(records: List[Dict[str, Any]]) -> Dict[str, Dict[str, A
                     'images': record.get('images', '').split(',') if record.get('images') else []
                 }
                 
-                logger.info(f"Successfully formatted property: {property_id} - {formatted_data[property_id]['name']}")
+                logger.info(f"Successfully formatted property: {property_id} - {formatted_data[property_id]['name']} with price: ₹{price:,}")
                 
             except Exception as e:
                 logger.error(f"Error formatting record {idx}: {str(e)}")

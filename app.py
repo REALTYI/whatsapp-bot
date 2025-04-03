@@ -58,24 +58,24 @@ except Exception as e:
 sessions = {}
 
 def parse_indian_currency(amount_str: str) -> int:
-    """Parse Indian currency format (e.g., '1cr', '50lakhs', '1.5cr') to rupees"""
+    """Parse Indian currency format (e.g., '1.5 Cr', '80 L', '2.5 Cr') to rupees"""
     try:
         # Remove spaces and convert to lowercase
-        amount_str = amount_str.lower().strip()
+        amount_str = str(amount_str).lower().strip()
         
         # Remove '₹' symbol if present
         amount_str = amount_str.replace('₹', '').strip()
         
-        # Handle crore format
+        # Handle crore format (Cr)
         if 'cr' in amount_str:
             # Extract the number before 'cr'
             number = float(amount_str.replace('cr', '').strip())
             return int(number * 10000000)  # 1 crore = 10 million rupees
             
-        # Handle lakhs format
-        elif 'lakh' in amount_str or 'lac' in amount_str:
-            # Extract the number before 'lakh' or 'lac'
-            number = float(amount_str.replace('lakh', '').replace('lac', '').strip())
+        # Handle lakhs format (L)
+        elif 'l' in amount_str:
+            # Extract the number before 'l'
+            number = float(amount_str.replace('l', '').strip())
             return int(number * 100000)  # 1 lakh = 100,000 rupees
             
         # Handle direct number format
