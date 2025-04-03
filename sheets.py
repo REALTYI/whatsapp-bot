@@ -3,6 +3,11 @@ from google.oauth2.service_account import Credentials
 import logging
 from typing import List, Dict, Any
 import os
+import json
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -14,26 +19,33 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Define the absolute path for credentials.json
-CREDENTIALS_PATH = r"C:\Users\darsh\OneDrive\Desktop\whatsapp-bot\credentials.json"
-
 def get_sheets_client():
     """Initialize and return Google Sheets client"""
     try:
-        # Check if credentials file exists at the absolute path
-        if not os.path.exists(CREDENTIALS_PATH):
-            logger.error(f"credentials.json file not found at: {CREDENTIALS_PATH}")
-            return None
+        # First try to get credentials from environment variable
+        creds_json = os.getenv('GOOGLE_CREDENTIALS')
+        if creds_json:
+            try:
+                # Parse the JSON string from environment variable
+                creds_dict = json.loads(creds_json)
+                creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+                client = gspread.authorize(creds)
+                logger.info("Successfully initialized Google Sheets client using environment credentials")
+                return client
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing credentials JSON: {str(e)}")
+        
+        # Fallback to credentials file
+        credentials_path = os.path.join(os.path.dirname(__file__), 'credentials.json')
+        if os.path.exists(credentials_path):
+            creds = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
+            client = gspread.authorize(creds)
+            logger.info("Successfully initialized Google Sheets client using credentials file")
+            return client
             
-        # Load credentials from service account file using absolute path
-        creds = Credentials.from_service_account_file(
-            CREDENTIALS_PATH,
-            scopes=SCOPES
-        )
-        # Authorize the client
-        client = gspread.authorize(creds)
-        logger.info("Successfully initialized Google Sheets client")
-        return client
+        logger.error("No credentials found in environment variables or credentials file")
+        return None
+            
     except Exception as e:
         logger.error(f"Error initializing Google Sheets client: {str(e)}")
         return None
