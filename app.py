@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from flask import Flask, request, jsonify
 from twilio.twiml.messaging_response import MessagingResponse
-from sheets import get_property_data, format_property_data
+from sheets import get_property_data, format_property_data, store_user_interaction, update_user_interaction_status
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -126,7 +126,7 @@ def whatsapp_bot():
 
         if from_number not in sessions:
             logger.debug(f"Creating new session for {from_number}")
-            sessions[from_number] = {'step': 'start'}
+            sessions[from_number] = {'step': 'start', 'phone_number': from_number}
 
         current_step = sessions[from_number]['step']
         logger.info(f"Processing message - Number: {from_number}, Message: '{incoming_msg}', Current step: {current_step}")
@@ -137,7 +137,7 @@ def whatsapp_bot():
         if incoming_msg in ['back', 'start']:
             logger.debug(f"Handling navigation command: {incoming_msg}")
             if incoming_msg == 'start':
-                sessions[from_number] = {'step': 'start'}
+                sessions[from_number] = {'step': 'start', 'phone_number': from_number}
                 logger.debug("Resetting session to start")
             elif current_step == 'collecting_budget':
                 sessions[from_number]['step'] = 'collecting_info'
@@ -151,16 +151,10 @@ def whatsapp_bot():
             debug_session(from_number, "after_navigation")
             return whatsapp_bot()
 
-        # Greeting
-        if current_step == 'start':
-            response.message("Hi there! 👋 Welcome to Real Estate Bot. How can I help you today? (e.g., 'Looking for a 3BHK')\n\nType 'start' anytime to begin again.")
-            sessions[from_number]['step'] = 'collecting_info'
-            return str(response)
-
         # Collecting user preferences
         if current_step == 'collecting_info':
             if 'bhk' in incoming_msg:
-                sessions[from_number]['bhk'] = incoming_msg
+                sessions[from_number]['property_type'] = incoming_msg
                 response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
                 sessions[from_number]['step'] = 'collecting_budget'
                 return str(response)
@@ -181,6 +175,16 @@ def whatsapp_bot():
         # Collecting location
         if current_step == 'collecting_location':
             sessions[from_number]['location'] = incoming_msg
+            
+            # Store initial interaction data
+            store_user_interaction({
+                'phone_number': from_number,
+                'property_type': sessions[from_number].get('property_type', ''),
+                'budget': sessions[from_number].get('budget', ''),
+                'location': incoming_msg,
+                'status': 'Searching'
+            })
+            
             response.message(f"Perfect! Let me show you some options in {incoming_msg} within your budget.")
             
             # Store property list in session for number-based selection
@@ -216,6 +220,10 @@ def whatsapp_bot():
                         break
             
             if prop_id and details:
+                # Update interaction with selected property
+                sessions[from_number]['selected_property'] = details['name']
+                update_user_interaction_status(from_number, 'Property Selected')
+                
                 response.message(f"Property: {details['name']}\nPrice: ₹{details['price']:,}\nLocation: {details['location']}\nDescription: {details['description']}")
                 send_property_images(response, details.get('images', []))
                 response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')\n\nType 'back' to see other properties\nType 'start' to begin again")
@@ -225,10 +233,28 @@ def whatsapp_bot():
             response.message("Sorry, I couldn't find that property. Please try again with the property number or name.\n\nType 'back' to see the property list\nType 'start' to begin again")
             return str(response)
 
+        # Handling visit scheduling
+        if current_step == 'visit':
+            if 'yes' in incoming_msg:
+                # Extract date and time from message
+                visit_schedule = incoming_msg.replace('yes', '').strip()
+                
+                # Update interaction with visit schedule
+                store_user_interaction({
+                    'phone_number': from_number,
+                    'property_type': sessions[from_number].get('property_type', ''),
+                    'budget': sessions[from_number].get('budget', ''),
+                    'location': sessions[from_number].get('location', ''),
+                    'selected_property': sessions[from_number].get('selected_property', ''),
+                    'visit_schedule': visit_schedule,
+                    'status': 'Visit Scheduled'
+                })
+                
+                response.message(f"Great! I've scheduled your visit for {visit_schedule}. Our representative will contact you shortly to confirm.\n\nType 'start' to look for more properties.")
+                return str(response)
+
         debug_session(from_number, "after_processing")
         
-        # If we reach here, something unexpected happened
-        logger.warning(f"Reached unexpected state - Step: {current_step}, Message: {incoming_msg}")
         response.message("Sorry, I didn't get that. Please try again.\n\nType 'back' to go back\nType 'start' to begin again")
         return str(response)
 

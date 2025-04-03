@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 import os
 import json
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -159,6 +160,104 @@ def format_property_data(records: List[Dict[str, Any]]) -> Dict[str, Dict[str, A
     except Exception as e:
         logger.error(f"Error in format_property_data: {str(e)}")
         return {}
+
+def store_user_interaction(user_data: Dict[str, Any]) -> bool:
+    """Store user interaction data in UserInteractions sheet"""
+    try:
+        client = get_sheets_client()
+        if not client:
+            logger.error("Could not initialize Google Sheets client")
+            return False
+
+        # Get spreadsheet ID from environment variable
+        sheet_id = os.getenv('GOOGLE_SHEET_ID')
+        if not sheet_id:
+            logger.error("No spreadsheet ID found in environment variables")
+            return False
+
+        try:
+            spreadsheet = client.open_by_key(sheet_id)
+            
+            # Try to get the UserInteractions worksheet, create if it doesn't exist
+            try:
+                worksheet = spreadsheet.worksheet('UserInteractions')
+                logger.info("Found existing UserInteractions sheet")
+            except gspread.WorksheetNotFound:
+                worksheet = spreadsheet.add_worksheet('UserInteractions', 1000, 10)
+                # Add headers
+                headers = [
+                    'Timestamp',
+                    'Phone Number',
+                    'Property Type',
+                    'Budget',
+                    'Location',
+                    'Selected Property',
+                    'Visit Schedule',
+                    'Status'
+                ]
+                worksheet.append_row(headers)
+                logger.info("Created new UserInteractions sheet with headers")
+
+            # Prepare row data
+            row_data = [
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                user_data.get('phone_number', ''),
+                user_data.get('property_type', ''),
+                user_data.get('budget', ''),
+                user_data.get('location', ''),
+                user_data.get('selected_property', ''),
+                user_data.get('visit_schedule', ''),
+                user_data.get('status', 'Inquiry')
+            ]
+
+            # Append the data
+            worksheet.append_row(row_data)
+            logger.info(f"Successfully stored user interaction for {user_data.get('phone_number', 'unknown')}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error accessing or updating spreadsheet: {str(e)}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Error in store_user_interaction: {str(e)}")
+        return False
+
+def update_user_interaction_status(phone_number: str, status: str) -> bool:
+    """Update the status of a user's interaction"""
+    try:
+        client = get_sheets_client()
+        if not client:
+            return False
+
+        sheet_id = os.getenv('GOOGLE_SHEET_ID')
+        if not sheet_id:
+            return False
+
+        spreadsheet = client.open_by_key(sheet_id)
+        worksheet = spreadsheet.worksheet('UserInteractions')
+
+        # Find the latest row for this phone number
+        phone_col = 2  # Column B
+        status_col = 8  # Column H
+        
+        # Get all phone numbers
+        phone_numbers = worksheet.col_values(phone_col)
+        
+        # Find the last occurrence of this phone number
+        for idx in range(len(phone_numbers) - 1, 0, -1):
+            if phone_numbers[idx] == phone_number:
+                # Update status
+                worksheet.update_cell(idx + 1, status_col, status)
+                logger.info(f"Updated status to {status} for {phone_number}")
+                return True
+        
+        logger.warning(f"No interaction found for phone number {phone_number}")
+        return False
+
+    except Exception as e:
+        logger.error(f"Error updating user interaction status: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     # Test the connection
