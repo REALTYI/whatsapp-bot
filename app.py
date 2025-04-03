@@ -11,8 +11,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
+# Enhanced Logging setup
+logging.basicConfig(
+    level=logging.DEBUG,  # Changed to DEBUG for more detailed logs
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Initialize property data from Google Sheets
@@ -57,6 +60,14 @@ except Exception as e:
 # Session data
 sessions = {}
 
+def debug_session(from_number: str, action: str):
+    """Debug helper to log session state"""
+    if from_number in sessions:
+        logger.debug(f"Session Debug - Number: {from_number}, Action: {action}")
+        logger.debug(f"Current State: {sessions[from_number]}")
+    else:
+        logger.debug(f"No session found for {from_number}")
+
 def parse_indian_currency(amount_str: str) -> int:
     """Parse Indian currency format (e.g., '1.5 Cr', '80 L', '2.5 Cr') to rupees"""
     try:
@@ -90,9 +101,15 @@ def parse_indian_currency(amount_str: str) -> int:
 def send_property_images(response, images):
     """Send property images using Twilio's Media Message API"""
     try:
+        if not images:
+            logger.warning("No images provided to send")
+            return False
+            
         msg = response.message("📸 Property Images:")
         for image_url in images[:10]:
+            logger.debug(f"Attempting to send image: {image_url}")
             msg.media(image_url)
+        logger.info(f"Successfully sent {len(images[:10])} images")
         return True
     except Exception as e:
         logger.error(f"Error sending images: {str(e)}")
@@ -100,108 +117,126 @@ def send_property_images(response, images):
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp_bot():
-    incoming_msg = request.form.get('Body', '').strip().lower()
-    from_number = request.form.get('From', '')
-    response = MessagingResponse()
+    try:
+        incoming_msg = request.form.get('Body', '').strip().lower()
+        from_number = request.form.get('From', '')
+        response = MessagingResponse()
 
-    if from_number not in sessions:
-        sessions[from_number] = {'step': 'start'}
+        logger.debug(f"Received message: '{incoming_msg}' from {from_number}")
 
-    current_step = sessions[from_number]['step']
-    logger.info(f"Incoming message from {from_number}: {incoming_msg} | Current step: {current_step}")
-
-    # Handle back and start commands
-    if incoming_msg in ['back', 'start']:
-        if incoming_msg == 'start':
+        if from_number not in sessions:
+            logger.debug(f"Creating new session for {from_number}")
             sessions[from_number] = {'step': 'start'}
-        elif current_step == 'collecting_budget':
+
+        current_step = sessions[from_number]['step']
+        logger.info(f"Processing message - Number: {from_number}, Message: '{incoming_msg}', Current step: {current_step}")
+
+        debug_session(from_number, "before_processing")
+
+        # Handle back and start commands
+        if incoming_msg in ['back', 'start']:
+            logger.debug(f"Handling navigation command: {incoming_msg}")
+            if incoming_msg == 'start':
+                sessions[from_number] = {'step': 'start'}
+                logger.debug("Resetting session to start")
+            elif current_step == 'collecting_budget':
+                sessions[from_number]['step'] = 'collecting_info'
+            elif current_step == 'collecting_location':
+                sessions[from_number]['step'] = 'collecting_budget'
+            elif current_step == 'details':
+                sessions[from_number]['step'] = 'collecting_location'
+            elif current_step == 'visit':
+                sessions[from_number]['step'] = 'details'
+            
+            debug_session(from_number, "after_navigation")
+            return whatsapp_bot()
+
+        # Greeting
+        if current_step == 'start':
+            response.message("Hi there! 👋 Welcome to Real Estate Bot. How can I help you today? (e.g., 'Looking for a 3BHK')\n\nType 'start' anytime to begin again.")
             sessions[from_number]['step'] = 'collecting_info'
-        elif current_step == 'collecting_location':
-            sessions[from_number]['step'] = 'collecting_budget'
-        elif current_step == 'details':
-            sessions[from_number]['step'] = 'collecting_location'
-        elif current_step == 'visit':
+            return str(response)
+
+        # Collecting user preferences
+        if current_step == 'collecting_info':
+            if 'bhk' in incoming_msg:
+                sessions[from_number]['bhk'] = incoming_msg
+                response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
+                sessions[from_number]['step'] = 'collecting_budget'
+                return str(response)
+            response.message("Could you specify the property type? (e.g., '3BHK apartment')\n\nType 'start' to begin again")
+            return str(response)
+
+        # Collecting budget
+        if current_step == 'collecting_budget':
+            budget = parse_indian_currency(incoming_msg)
+            if budget > 0:
+                sessions[from_number]['budget'] = budget
+                response.message("Got it! Any preferred location?\n\nType 'back' to change budget\nType 'start' to begin again")
+                sessions[from_number]['step'] = 'collecting_location'
+                return str(response)
+            response.message("Please enter a valid budget amount (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
+            return str(response)
+
+        # Collecting location
+        if current_step == 'collecting_location':
+            sessions[from_number]['location'] = incoming_msg
+            response.message(f"Perfect! Let me show you some options in {incoming_msg} within your budget.")
+            
+            # Store property list in session for number-based selection
+            property_list = list(PROPERTIES.items())
+            sessions[from_number]['property_list'] = property_list
+            
+            # Listing matching properties with numbers
+            for idx, (prop_id, details) in enumerate(property_list, 1):
+                response.message(f"{idx}. 🏡 {details['name']}: ₹{details['price']:,} at {details['location']} ({details['bhk']} BHK)")
+            
+            response.message("Reply with the property number or name for more details.\n\nType 'back' to change location\nType 'start' to begin again")
             sessions[from_number]['step'] = 'details'
-        
-        # Return to the appropriate step
-        return whatsapp_bot()
-
-    # Greeting
-    if current_step == 'start':
-        response.message("Hi there! 👋 Welcome to Real Estate Bot. How can I help you today? (e.g., 'Looking for a 3BHK')\n\nType 'start' anytime to begin again.")
-        sessions[from_number]['step'] = 'collecting_info'
-        return str(response)
-
-    # Collecting user preferences
-    if current_step == 'collecting_info':
-        if 'bhk' in incoming_msg:
-            sessions[from_number]['bhk'] = incoming_msg
-            response.message("Great choice! What's your budget range? (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
-            sessions[from_number]['step'] = 'collecting_budget'
             return str(response)
-        response.message("Could you specify the property type? (e.g., '3BHK apartment')\n\nType 'start' to begin again")
-        return str(response)
 
-    # Collecting budget
-    if current_step == 'collecting_budget':
-        budget = parse_indian_currency(incoming_msg)
-        if budget > 0:
-            sessions[from_number]['budget'] = budget
-            response.message("Got it! Any preferred location?\n\nType 'back' to change budget\nType 'start' to begin again")
-            sessions[from_number]['step'] = 'collecting_location'
+        # Displaying property details
+        if current_step == 'details':
+            property_list = sessions[from_number].get('property_list', [])
+            
+            # Try to find property by number
+            try:
+                property_idx = int(incoming_msg) - 1
+                if 0 <= property_idx < len(property_list):
+                    prop_id, details = property_list[property_idx]
+                else:
+                    raise ValueError("Invalid property number")
+            except ValueError:
+                # Try to find property by name
+                prop_id = None
+                for pid, d in PROPERTIES.items():
+                    if incoming_msg == d['name'].lower():
+                        prop_id = pid
+                        details = d
+                        break
+            
+            if prop_id and details:
+                response.message(f"Property: {details['name']}\nPrice: ₹{details['price']:,}\nLocation: {details['location']}\nDescription: {details['description']}")
+                send_property_images(response, details.get('images', []))
+                response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')\n\nType 'back' to see other properties\nType 'start' to begin again")
+                sessions[from_number]['step'] = 'visit'
+                return str(response)
+            
+            response.message("Sorry, I couldn't find that property. Please try again with the property number or name.\n\nType 'back' to see the property list\nType 'start' to begin again")
             return str(response)
-        response.message("Please enter a valid budget amount (e.g., '1cr', '50lakhs', '1.5cr')\n\nType 'back' to change property type\nType 'start' to begin again")
+
+        debug_session(from_number, "after_processing")
+        
+        # If we reach here, something unexpected happened
+        logger.warning(f"Reached unexpected state - Step: {current_step}, Message: {incoming_msg}")
+        response.message("Sorry, I didn't get that. Please try again.\n\nType 'back' to go back\nType 'start' to begin again")
         return str(response)
 
-    # Collecting location
-    if current_step == 'collecting_location':
-        sessions[from_number]['location'] = incoming_msg
-        response.message(f"Perfect! Let me show you some options in {incoming_msg} within your budget.")
-        
-        # Store property list in session for number-based selection
-        property_list = list(PROPERTIES.items())
-        sessions[from_number]['property_list'] = property_list
-        
-        # Listing matching properties with numbers
-        for idx, (prop_id, details) in enumerate(property_list, 1):
-            response.message(f"{idx}. 🏡 {details['name']}: ₹{details['price']:,} at {details['location']} ({details['bhk']} BHK)")
-        
-        response.message("Reply with the property number or name for more details.\n\nType 'back' to change location\nType 'start' to begin again")
-        sessions[from_number]['step'] = 'details'
+    except Exception as e:
+        logger.error(f"Unexpected error in whatsapp_bot: {str(e)}", exc_info=True)
+        response = MessagingResponse()
+        response.message("Sorry, something went wrong. Please type 'start' to begin again.")
         return str(response)
-
-    # Displaying property details
-    if current_step == 'details':
-        property_list = sessions[from_number].get('property_list', [])
-        
-        # Try to find property by number
-        try:
-            property_idx = int(incoming_msg) - 1
-            if 0 <= property_idx < len(property_list):
-                prop_id, details = property_list[property_idx]
-            else:
-                raise ValueError("Invalid property number")
-        except ValueError:
-            # Try to find property by name
-            prop_id = None
-            for pid, d in PROPERTIES.items():
-                if incoming_msg == d['name'].lower():
-                    prop_id = pid
-                    details = d
-                    break
-        
-        if prop_id and details:
-            response.message(f"Property: {details['name']}\nPrice: ₹{details['price']:,}\nLocation: {details['location']}\nDescription: {details['description']}")
-            send_property_images(response, details.get('images', []))
-            response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')\n\nType 'back' to see other properties\nType 'start' to begin again")
-            sessions[from_number]['step'] = 'visit'
-            return str(response)
-        
-        response.message("Sorry, I couldn't find that property. Please try again with the property number or name.\n\nType 'back' to see the property list\nType 'start' to begin again")
-        return str(response)
-
-    response.message("Sorry, I didn't get that. Please try again.\n\nType 'back' to go back\nType 'start' to begin again")
-    return str(response)
 
 @app.route('/', methods=['GET'])
 def root():
