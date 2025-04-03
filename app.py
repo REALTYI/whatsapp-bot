@@ -157,21 +157,48 @@ def whatsapp_bot():
     if current_step == 'collecting_location':
         sessions[from_number]['location'] = incoming_msg
         response.message(f"Perfect! Let me show you some options in {incoming_msg} within your budget.")
-        # Listing matching properties
-        for prop_id, details in PROPERTIES.items():
-            response.message(f"🏡 {details['name']}: ₹{details['price']} at {details['location']} ({details['bhk']} BHK)")
-        response.message("Reply with the property name for more details.\n\nType 'back' to change location\nType 'start' to begin again")
+        
+        # Store property list in session for number-based selection
+        property_list = list(PROPERTIES.items())
+        sessions[from_number]['property_list'] = property_list
+        
+        # Listing matching properties with numbers
+        for idx, (prop_id, details) in enumerate(property_list, 1):
+            response.message(f"{idx}. 🏡 {details['name']}: ₹{details['price']:,} at {details['location']} ({details['bhk']} BHK)")
+        
+        response.message("Reply with the property number or name for more details.\n\nType 'back' to change location\nType 'start' to begin again")
         sessions[from_number]['step'] = 'details'
         return str(response)
 
     # Displaying property details
-    for prop_id, details in PROPERTIES.items():
-        if incoming_msg == details['name'].lower() and current_step == 'details':
-            response.message(f"Property: {details['name']}\nPrice: ₹{details['price']}\nLocation: {details['location']}\nDescription: {details['description']}")
+    if current_step == 'details':
+        property_list = sessions[from_number].get('property_list', [])
+        
+        # Try to find property by number
+        try:
+            property_idx = int(incoming_msg) - 1
+            if 0 <= property_idx < len(property_list):
+                prop_id, details = property_list[property_idx]
+            else:
+                raise ValueError("Invalid property number")
+        except ValueError:
+            # Try to find property by name
+            prop_id = None
+            for pid, d in PROPERTIES.items():
+                if incoming_msg == d['name'].lower():
+                    prop_id = pid
+                    details = d
+                    break
+        
+        if prop_id and details:
+            response.message(f"Property: {details['name']}\nPrice: ₹{details['price']:,}\nLocation: {details['location']}\nDescription: {details['description']}")
             send_property_images(response, details.get('images', []))
             response.message("Do you want to schedule a visit? (e.g., 'Yes, tomorrow at 4 PM')\n\nType 'back' to see other properties\nType 'start' to begin again")
             sessions[from_number]['step'] = 'visit'
             return str(response)
+        
+        response.message("Sorry, I couldn't find that property. Please try again with the property number or name.\n\nType 'back' to see the property list\nType 'start' to begin again")
+        return str(response)
 
     response.message("Sorry, I didn't get that. Please try again.\n\nType 'back' to go back\nType 'start' to begin again")
     return str(response)
